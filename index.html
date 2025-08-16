@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3 კარტა ბურა - მთვლელი</title>
+  <style>
+    :root {
+      --gap: 12px;
+      --card-w: 64px;
+      --card-h: 72px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, "Apple Color Emoji", "Segoe UI Emoji";
+      background: #395563;
+      color: #222;
+      padding: 20px;
+      line-height: 1.35;
+      text-align: center;
+    }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    p { margin: 0 0 10px; }
+
+    /* --- კარტების განლაგება: თითო რანგი = ცალკე ზოლი --- */
+    .deck-rows { display: inline-grid; gap: var(--gap); margin-top: 12px; }
+    .rank-row {
+      display: grid;
+      grid-template-columns: 60px repeat(4, var(--card-w));
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+    }
+    .rank-label { font-weight: 700; color: #ECF2F7; text-align: right; padding-right: 6px; }
+
+    .card {
+      width: var(--card-w);
+      height: var(--card-h);
+      border: 1px solid #d3d7e3;
+      border-radius: 10px;
+      padding: 6px;
+      text-align: center;
+      cursor: pointer;
+      background: #558B2F; /* მოუნიშნავი */
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      display: grid;
+      place-content: center;
+      white-space: pre-line;
+      user-select: none;
+      transition: transform .05s ease, background .15s ease, color .15s ease;
+      font-weight: bold;
+    }
+    .card:active { transform: scale(0.98); }
+    .card.active { background: #263238; border-color: #263238; }
+    .card.active span { opacity: 0.3; }
+
+    /* --- დარჩენილი და ალბათობები გვერდიგვერდ --- */
+    .flex-cols {
+      display: flex;
+      gap: var(--gap);
+      margin-top: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      text-align: left;
+    }
+    .section {
+      flex: 1;
+      min-width: 260px;
+      background: rgba(255,255,255,0.08);
+      padding: 12px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      backdrop-filter: blur(6px);
+      color: #fff;
+    }
+    .section h2 { font-size: 16px; margin: 0 0 8px; }
+
+    .prob-box { margin-top: 6px; font-size: 14px; }
+
+    @media (max-width: 760px) {
+      .rank-row { grid-template-columns: 48px repeat(4, var(--card-w)); }
+      .rank-label { font-size: 13px; }
+    }
+  .top { max-width: 860px; margin: 0 auto 12px; }
+  </style>
+</head>
+<body>
+  <div class="section top">
+    <h1>3 კარტა ბურა — კარტების მთვლელი (HTML ვერსია)</h1>
+    <p>კოლოდა: 20 კარტა (10, J, Q, K, A × 4). მონიშნე რომელი კარტებიც უკვე გამოვიდა.</p>
+  </div>
+
+  <!-- სათაურები ცვეტებისთვის -->
+  <div class="rank-row">
+    <div></div>
+    <div style="text-align:center; color:#264653"><div>ყვავი</div><div>♠</div></div>
+    <div style="text-align:center; color:#E63946"><div>გული</div><div>♥</div></div>
+    <div style="text-align:center; color:#F4A261"><div>აგური</div><div>♦</div></div>
+    <div style="text-align:center; color:#2A9D8F"><div>ჯვარი</div><div>♣</div></div>
+  </div>
+
+  <!-- თითო რანგი ერთ ზოლზე -->
+  <div id="deckRows" class="deck-rows"></div>
+
+  <!-- დარჩენილი სტატუსი და ალბათობები -->
+  <div class="flex-cols">
+    <div class="section">
+      <h2>დარჩენილი სტატუსი</h2>
+      <p id="remain"></p>
+    </div>
+    <div class="section">
+      <h2>ალბათობები (ცვეტის მიხედვით)</h2>
+      <div id="probs"></div>
+    </div>
+  </div>
+
+<script>
+const ranks = ["10","J","Q","K","A"];
+const suits = ["♠","♥","♦","♣"];
+const suitColors = {"♠":"#264653","♥":"#E63946","♦":"#F4A261","♣":"#2A9D8F"};
+
+const deckRowsEl = document.getElementById("deckRows");
+const remainEl = document.getElementById("remain");
+const probsEl = document.getElementById("probs");
+
+let seen = {};
+
+// Helper: combination
+function nCk(n,k){
+  if(k>n || k<0) return 0;
+  if(k===0||k===n) return 1;
+  let res=1;
+  for(let i=1;i<=k;i++) res = (res * (n-(k-i))) / i;
+  return res;
+}
+
+// ავაშენოთ რიგები: თითო რანგი = ზოლი (ეტიკეტი + 4 მასტი)
+function buildDeck(){
+  deckRowsEl.innerHTML = "";
+  ranks.forEach(r => {
+    const row = document.createElement("div");
+    row.className = "rank-row";
+
+    const label = document.createElement("div");
+    label.className = "rank-label";
+    label.textContent = r;
+    row.appendChild(label);
+
+    suits.forEach(s => {
+      const id = r+s;
+      const btn = document.createElement("div");
+      btn.className = "card" + (seen[id] ? " active" : "");
+      const span = document.createElement("span");
+      span.textContent = r + "\n" + s;
+      span.style.color = suitColors[s];
+      btn.appendChild(span);
+      btn.onclick = () => {
+        seen[id] = !seen[id];
+        btn.classList.toggle("active");
+        recalc();
+      };
+      row.appendChild(btn);
+    });
+
+    deckRowsEl.appendChild(row);
+  });
+}
+
+function recalc(){
+  // დარჩენილი კარტების შეკრება
+  const remaining = [];
+  ranks.forEach(r=>{
+    suits.forEach(s=>{ if(!seen[r+s]) remaining.push({rank:r,suit:s}); });
+  });
+
+  // სტატუსი (რანგით და ცვეტით)
+  const byRank = Object.fromEntries(ranks.map(r=>[r,0]));
+  const bySuit = Object.fromEntries(suits.map(s=>[s,0]));
+  remaining.forEach(c=>{ byRank[c.rank]++; bySuit[c.suit]++; });
+
+  let remainHTML = `დარჩა ${remaining.length} კარტა — 10:${byRank["10"]}  J:${byRank["J"]}  Q:${byRank["Q"]}  K:${byRank["K"]}  A:${byRank["A"]}  |`;
+  remainHTML += ` <span style="color:${suitColors["♠"]}">♠:${bySuit["♠"]}</span>`;
+  remainHTML += ` <span style="color:${suitColors["♥"]}">♥:${bySuit["♥"]}</span>`;
+  remainHTML += ` <span style="color:${suitColors["♦"]}">♦:${bySuit["♦"]}</span>`;
+  remainHTML += ` <span style="color:${suitColors["♣"]}">♣:${bySuit["♣"]}</span>`;
+  remainEl.innerHTML = remainHTML;
+
+  // ალბათობები — სამივე ერთნაირი ცვეტი
+  const N = remaining.length;
+  const totalHands = nCk(N,3);
+  let html = "";
+
+  suits.forEach(s=>{
+    const cnt = bySuit[s];
+    const ways = nCk(cnt,3);
+    const p = totalHands>0 ? (ways/totalHands*100) : 0;
+    html += `<div class='prob-box' style='color:${suitColors[s]}'>${s} (სამივე იგივე ცვეტი): ${p.toFixed(3)}%</div>`;
+  });
+
+  const sumSuitTrips = suits.reduce((acc,s)=> acc + nCk(bySuit[s],3), 0);
+  const pAnySuit = totalHands>0 ? (sumSuitTrips/totalHands*100) : 0;
+  html += `<div class='prob-box'><b>მინიმუმ 3 ერთნაირი ცვეტი (ყველა 3):</b> ${pAnySuit.toFixed(3)}%</div>`;
+
+  probsEl.innerHTML = html;
+}
+
+buildDeck();
+recalc();
+</script>
+</body>
+</html>
